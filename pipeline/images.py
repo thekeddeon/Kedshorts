@@ -1,4 +1,4 @@
-"""Image generation via Hugging Face Inference (free with HF_TOKEN) + local fallback."""
+"""Free image generation via Hugging Face Inference (HF_TOKEN) with visual fallback."""
 from __future__ import annotations
 
 import io
@@ -27,13 +27,20 @@ def full_visual_prompt(scene: str, style_suffix: str | None = None) -> str:
     return f"{scene.strip()}{(style_suffix or STYLE_SUFFIX)}"
 
 
-def _minimal_png_bytes(width: int = 768, height: int = 768) -> bytes:
-    """Create a valid solid-color PNG without external dependencies."""
+def _minimal_png_bytes(width: int = 768, height: int = 768, index: int = 0) -> bytes:
+    """Create a valid PNG without external dependencies."""
     w = max(1, int(width))
     h = max(1, int(height))
-    row = b"\x00" + (b"\x18\x1c\x2a" * w)
-    raw_data = row * h
-    compressed = zlib.compress(raw_data, level=6)
+    colors = [
+        b"\x1f\x3a\x5f",
+        b"\x4a\x2c\x5e",
+        b"\x1e\x52\x4a",
+        b"\x5e\x38\x24",
+        b"\x3b\x4d\x28",
+    ]
+    rgb = colors[index % len(colors)]
+    row = b"\x00" + (rgb * w)
+    compressed = zlib.compress(row * h, level=6)
 
     def _chunk(chunk_type: bytes, data: bytes) -> bytes:
         crc = zlib.crc32(chunk_type + data) & 0xFFFFFFFF
@@ -49,26 +56,70 @@ def _minimal_png_bytes(width: int = 768, height: int = 768) -> bytes:
 
 
 def _local_fallback_image(index: int, width: int, height: int, out_path: Path) -> None:
-    """Generate a local fallback image so downstream pipeline steps can run for free."""
+    """Create a varied visual fallback so the video never has a plain solid screen."""
+    w = max(1, int(width))
+    h = max(1, int(height))
     try:
         from PIL import Image, ImageDraw
 
-        palette = [
-            (28, 37, 65),
-            (38, 53, 72),
-            (46, 36, 59),
-            (27, 52, 58),
-            (54, 42, 46),
+        palettes = [
+            ((18, 24, 38), (46, 125, 150), (235, 175, 65)),
+            ((28, 20, 42), (130, 68, 165), (90, 210, 180)),
+            ((18, 36, 34), (42, 145, 115), (240, 130, 75)),
+            ((42, 24, 24), (175, 75, 55), (245, 195, 85)),
+            ((22, 30, 46), (75, 115, 195), (225, 105, 135)),
         ]
-        bg = palette[index % len(palette)]
-        img = Image.new("RGB", (max(1, width), max(1, height)), color=bg)
+        bg, accent, highlight = palettes[index % len(palettes)]
+
+        img = Image.new("RGB", (w, h), color=bg)
         draw = ImageDraw.Draw(img)
-        draw.text((40, max(10, height // 2)), f"Scene {index + 1}", fill=(240, 244, 248))
+
+        # Subtle horizontal bands for visual depth
+        bands = 8
+        band_h = max(1, h // bands)
+        for b_idx in range(bands):
+            factor = 0.75 + (b_idx / max(1, bands - 1)) * 0.45
+            r = min(255, int(bg[0] * factor))
+            g = min(255, int(bg[1] * factor))
+            b = min(255, int(bg[2] * factor))
+            y0 = b_idx * band_h
+            y1 = h if b_idx == bands - 1 else (b_idx + 1) * band_h
+            draw.rectangle([0, y0, w, y1], fill=(r, g, b))
+
+        # Geometric shapes per scene
+        cx, cy = w // 2, h // 2
+        radius = max(24, min(w, h) // 4)
+        offset = ((index % 3) - 1) * max(20, radius // 2)
+        draw.ellipse(
+            [cx - radius + offset, cy - radius, cx + radius + offset, cy + radius],
+            outline=accent,
+            width=max(3, min(w, h) // 120),
+        )
+        inner_r = max(12, radius // 2)
+        draw.rectangle(
+            [cx - inner_r, cy - inner_r + offset, cx + inner_r, cy + inner_r + offset],
+            outline=highlight,
+            width=max(2, min(w, h) // 180),
+        )
+
+        margin = max(20, min(w, h) // 24)
+        draw.rectangle(
+            [margin, margin, w - margin, h - margin],
+            outline=accent,
+            width=max(2, min(w, h) // 200),
+        )
+
+        draw.text(
+            (margin + 16, h - margin - max(28, h // 18)),
+            f"Scene {index + 1}",
+            fill=(245, 247, 250),
+        )
+
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         out_path.write_bytes(buf.getvalue())
     except ImportError:
-        out_path.write_bytes(_minimal_png_bytes(width, height))
+        out_path.write_bytes(_minimal_png_bytes(w, h, index=index))
 
 
 def _hf_generate(
@@ -112,7 +163,7 @@ def save_scene_image(
     height: int = 768,
     negative: str = DEFAULT_NEGATIVE,
 ) -> tuple[str, str]:
-    """Generate and save one image. Returns (status, detail)."""
+    """Generate one image via Hugging Face, with a safe visual fallback."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -140,5 +191,7 @@ def save_scene_image(
     try:
         _local_fallback_image(index, width, height, out_path)
         return "ok", "fallback-local (HF_TOKEN not set)"
+    except Exception as fallback_err:
+        return "fail", f"fallback failed: {fallback_err}"
     except Exception as fallback_err:
         return "fail", f"fallback failed: {fallback_err}"
