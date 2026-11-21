@@ -191,7 +191,6 @@ PRESETS: dict[str, ChannelPreset] = {
         "topic_rotation": "myth",
         "language": "hi",
         "min_words": 100,
-        # Edge TTS Hindi: Swara = warm female (common for katha / devotion). Override: hi-IN-MadhurNeural (male).
         "tts_voice": "hi-IN-SwaraNeural",
         "caption_font": "NotoSansDevanagari-Bold.ttf",
         "caption_font_name": "Noto Sans Devanagari",
@@ -199,7 +198,148 @@ PRESETS: dict[str, ChannelPreset] = {
         "extra_yt_token_envs": ["YT_REFRESH_TOKEN_MYTH_2"],
         "groq_system_hint": (
             "You write respectful Hindi Shorts about Indian mythology, epics, and devotion — for a general audience. "
-            "
+            "LANGUAGE: full_narration, youtube_title, youtube_description entirely in Devanagari Hindi. "
+            "IMAGE PROMPTS: English only — cinematic scene descriptions (no text in image). "
+            "CRITICAL LENGTH: full_narration 105-135 Devanagari words (~40-50 sec spoken). "
+            "Tone: warm, storytelling, reverent — NOT mocking faith. Retell traditional narratives in your own words; "
+            "do not copy long scripture passages. PG-13, no graphic gore, no hate toward any group. "
+            "No hashtags in narration. The creator gives a specific story angle in the user message — stay on that topic."
+        ),
+        "segment_count": 6,
+        "image_style_suffix": (
+            ", cinematic Indian mythology digital painting, golden hour lighting, rich jewel tones, "
+            "detailed divine atmosphere, epic composition, respectful devotional art style, "
+            "high quality illustration, no text, no watermark, no logos"
+        ),
+        "image_negative_prompt": (
+            "photorealistic human face close-up as real celebrity, gore, blood, horror jumpscare, "
+            "disrespectful parody, political symbols, watermark, text, logo, blurry, low quality, "
+            "multiple conflicting styles, broken anatomy"
+        ),
+        "topic_pool": [],
+    },
+    "school_story": {
+        "id": "school_story",
+        "label": "School drama / storytime Short",
+        "groq_system_hint": (
+            "You write fictional school storytime Shorts. Tone: suspense + heart. "
+            "Characters are original (no copyrighted names). Hook in line 1. "
+            "Build to one memorable twist. Keep each kid-safe."
+        ),
+        "segment_count": 5,
+        "topic_pool": [
+            "the new kid nobody noticed",
+            "a locker that wouldn't open",
+            "a substitute teacher with a secret",
+            "the lost lunchbox mystery",
+            "a field trip gone strange",
+            "the science fair disaster",
+            "a friendship bracelet with a twist",
+            "a school play that went wrong",
+            "the detention room incident",
+            "a letter passed in class",
+        ],
+    },
+    "psych_tradeoff": {
+        "id": "psych_tradeoff",
+        "label": "Psychology / habits (non-clinical)",
+        "groq_system_hint": (
+            "You write Shorts about habits, motivation, and everyday psychology. "
+            "Never diagnose or claim medical facts. Use 'some people' / 'research suggests' carefully. "
+            "Practical tips only."
+        ),
+        "segment_count": 5,
+        "topic_pool": [
+            "why procrastination actually happens",
+            "the 2-minute rule for habits",
+            "why we care what strangers think",
+            "how your morning sets your day",
+            "the truth about motivation",
+            "why boredom is good for you",
+            "the psychology of saying no",
+            "why small wins matter",
+            "how overthinking actually hurts",
+            "the real reason we scroll endlessly",
+        ],
+    },
+    "history_micro": {
+        "id": "history_micro",
+        "label": "One moment in history",
+        "groq_system_hint": (
+            "You write one tight historical anecdote per Short. Pick public-domain or widely taught events. "
+            "No graphic violence. End with why it matters in one line."
+        ),
+        "segment_count": 5,
+        "topic_pool": [
+            "a lesser-known ancient invention",
+            "a moment that almost changed history",
+            "an underrated figure from ancient times",
+            "a coincidence that shaped a war",
+            "a forgotten discovery at sea",
+            "an ancient ruler's unexpected habit",
+            "a medieval tradition nobody remembers",
+            "a natural disaster that changed a city",
+            "a lost city that was finally found",
+            "an accidental scientific breakthrough",
+        ],
+    },
+    "ghost_stories": {
+        "id": "ghost_stories",
+        "label": "Ghost / horror storytime Short",
+        "min_words": 100,
+        "groq_system_hint": (
+            "You write spooky ghost story Shorts for YouTube. "
+            "CRITICAL LENGTH RULE: The TOTAL word count across ALL 6 segments MUST be 120-140 words. "
+            "Each segment narration = 2-3 sentences, about 20-25 words per segment. "
+            "This produces 35-45 seconds of audio when read aloud. "
+            "Tone: eerie, suspenseful, creepy but NOT gory or violent. "
+            "Segment 1: hook that stops scrolling. Last segment: chilling twist or unanswered question. "
+            "All stories fictional. Original characters. PG-13. No hashtags in narration."
+        ),
+        "segment_count": 6,
+        "image_style_suffix": (
+            ", dark spooky cartoon illustration, eerie atmosphere, creepy stylized art, "
+            "bold outlines, muted haunting colors, horror cartoon aesthetic, ghostly shadows, "
+            "dramatic lighting, sinister mood, professional youtube thumbnail quality, "
+            "no text, no captions, no watermark, no logos"
+        ),
+        "image_negative_prompt": (
+            "photorealistic, photograph, happy cheerful bright, anime eyes, blurry, "
+            "low quality, watermark, logo, text, title, signature, ugly, grainy, "
+            "gore, blood, nudity, child-unsafe"
+        ),
+        "topic_pool": [
+            "a ghost haunting an empty school at night",
+            "a strange presence in a family home",
+            "something unexplained during a picnic in the woods",
+            "a ghost encounter at a friend's sleepover",
+            "a haunted old cabin during a camping trip",
+            "a ghost on a late-night train",
+            "something wrong with the new neighbor's house",
+            "a spirit in grandparents' attic",
+            "an abandoned playground after dark",
+            "a ghost at a roadside motel",
+            "strange events at a wedding venue",
+            "a haunted library after closing",
+            "something watching from the forest edge",
+            "a ghost during a blackout storm",
+            "an eerie presence at a local hospital",
+            "something in the basement nobody talks about",
+            "a ghost on a deserted beach at night",
+            "a haunted elevator in an old building",
+            "a strange figure at a bus stop at 3 AM",
+            "something whispering from an old well",
+            "a ghost in a classroom after everyone left",
+            "a haunted antique bought from a flea market",
+            "a spirit tied to an old family photograph",
+            "something in the fog on a mountain road",
+            "a ghost at a summer camp",
+        ],
+    },
+}
+
+
+def list_channel_ids() -> list[str]:
     return sorted(PRESETS.keys())
 
 
