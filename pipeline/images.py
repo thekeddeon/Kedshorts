@@ -63,7 +63,8 @@ def _deapi_generate(
                 print(f"      DeAPI 429 on submit — waiting {wait}s (try {submit_try + 1}/5)…")
                 time.sleep(wait)
                 continue
-            resp.raise_for_status()
+            if resp.status_code >= 400:
+                raise RuntimeError(f"DeAPI {resp.status_code} (model={model}): {resp.text}")
             break
         else:
             raise RuntimeError("DeAPI: 429 on submit after 5 retries")
