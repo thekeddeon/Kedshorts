@@ -1,15 +1,18 @@
-"""Free image generation via Hugging Face Inference (HF_TOKEN) with visual fallback."""
+"""Free image generation via Hugging Face Inference with Pollinations and local fallback."""
 from __future__ import annotations
 
 import io
 import os
+import random
 import struct
+import urllib.parse
 import zlib
 from pathlib import Path
 
 import httpx
 
 HF_DEFAULT_MODEL = "black-forest-labs/FLUX.1-schnell"
+POLLINATIONS_BASE_URL = "https://image.pollinations.ai/prompt"
 
 STYLE_SUFFIX = (
     ", cinematic digital illustration, detailed scene art, strong composition, "
@@ -74,7 +77,6 @@ def _local_fallback_image(index: int, width: int, height: int, out_path: Path) -
         img = Image.new("RGB", (w, h), color=bg)
         draw = ImageDraw.Draw(img)
 
-        # Subtle horizontal bands for visual depth
         bands = 8
         band_h = max(1, h // bands)
         for b_idx in range(bands):
@@ -86,7 +88,6 @@ def _local_fallback_image(index: int, width: int, height: int, out_path: Path) -
             y1 = h if b_idx == bands - 1 else (b_idx + 1) * band_h
             draw.rectangle([0, y0, w, y1], fill=(r, g, b))
 
-        # Geometric shapes per scene
         cx, cy = w // 2, h // 2
         radius = max(24, min(w, h) // 4)
         offset = ((index % 3) - 1) * max(20, radius // 2)
@@ -154,6 +155,33 @@ def _hf_generate(
         return resp.content
 
 
+def _pollinations_generate(
+    prompt: str,
+    *,
+    width: int,
+    height: int,
+    seed: int,
+) -> bytes:
+    """Generate a free image via Pollinations.ai without an API key."""
+    encoded_prompt = urllib.parse.quote(prompt, safe="")
+    url = f"{POLLINATIONS_BASE_URL}/{encoded_prompt}"
+    params = {
+        "width": width,
+        "height": height,
+        "seed": seed,
+        "nologo": "true",
+    }
+
+    with httpx.Client(timeout=120.0, follow_redirects=True) as client:
+        resp = client.get(url, params=params)
+        if resp.status_code >= 400:
+            raise RuntimeError(f"Pollinations {resp.status_code}: {resp.text[:200]}")
+        content_type = resp.headers.get("content-type", "")
+        if "image" not in content_type and len(resp.content) < 1024:
+            raise RuntimeError(f"Pollinations returned non-image response: {resp.text[:200]}")
+        return resp.content
+
+
 def save_scene_image(
     index: int,
     prompt: str,
@@ -163,12 +191,13 @@ def save_scene_image(
     height: int = 768,
     negative: str = DEFAULT_NEGATIVE,
 ) -> tuple[str, str]:
-    """Generate one image via Hugging Face, with a safe visual fallback."""
+    """Generate one image via Hugging Face, Pollinations fallback, or local fallback."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     hf_token = os.environ.get("HF_TOKEN", "").strip()
     hf_model = os.environ.get("HF_IMAGE_MODEL", HF_DEFAULT_MODEL).strip() or HF_DEFAULT_MODEL
+    errors: list[str] = []
 
     if hf_token:
         try:
@@ -182,16 +211,27 @@ def save_scene_image(
             out_path.write_bytes(img_bytes)
             return "ok", f"hf:{hf_model}"
         except Exception as e:
-            try:
-                _local_fallback_image(index, width, height, out_path)
-                return "ok", f"fallback-local ({e})"
-            except Exception as fallback_err:
-                return "fail", f"{e} | fallback failed: {fallback_err}"
+            errors.append(str(e))
+
+    try:
+        img_bytes = _pollinations_generate(
+            prompt,
+            width=width,
+            height=height,
+            seed=random.randint(1, 999999),
+        )
+        out_path.write_bytes(img_bytes)
+        return "ok", "pollinations"
+    except Exception as e:
+        errors.append(str(e))
 
     try:
         _local_fallback_image(index, width, height, out_path)
-        return "ok", "fallback-local (HF_TOKEN not set)"
+        reason = " | ".join(errors) if errors else "no image provider succeeded"
+        return "ok", f"fallback-local ({reason})"
     except Exception as fallback_err:
-        return "fail", f"fallback failed: {fallback_err}"
+        detail = " | ".join(errors + [f"fallback failed: {fallback_err}"])
+        return "fail", detail
+
     except Exception as fallback_err:
         return "fail", f"fallback failed: {fallback_err}"
